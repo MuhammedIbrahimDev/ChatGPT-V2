@@ -1,0 +1,95 @@
+body {
+      background-color: #f8f9fa;
+      font-family: "Segoe UI", sans-serif;
+    }
+    .chat-box {
+      max-width: 800px;
+      margin: auto;
+      margin-top: 30px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      height: 90vh;
+    }
+    .chat-header {
+      background-color: #0d6efd;
+      color: white;
+      padding: 1rem;
+      font-weight: bold;
+      text-align: center;
+    }
+    .chat-messages {
+      flex: 1;
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    .chat-input {
+      border-top: 1px solid #dee2e6;
+      padding: 1rem;
+    }
+    .bubble {
+      padding: 10px 15px;
+      border-radius: 15px;
+      margin-bottom: 10px;
+      max-width: 75%;
+      word-wrap: break-word;
+    }
+    .user-msg {
+      background-color: #0d6efd;
+      color: white;
+      margin-left: auto;
+    }
+    .assistant-msg {
+      background-color: #e9ecef;
+      margin-right: auto;
+    }
+
+
+    /*-----------------------------------*/
+    /* جدول داخل فقاعات الشات */
+.chat-messages table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 15px;
+  text-align: center;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chat-messages thead tr {
+  background-color: #004581;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.chat-messages th,
+.chat-messages td {
+  padding: 12px 15px;
+}
+
+.chat-messages tbody tr {
+  border-bottom: 1px solid #dddddd;
+  background-color: #ffffff;
+  transition: background-color 0.3s ease;
+}
+
+.chat-messages tbody tr:hover {
+  background-color: #f1f7fd;
+}
+
+.chat-messages tbody tr:last-of-type {
+  border-bottom: 2px solid #004581;
+}
+
+
+.chat-messages .table-wrapper {
+  overflow-x: auto;
+}
+
+.chat-messages .table-wrapper table {
+  min-width: 600px; /* أو أي عرض تريده للحد الأدنى */
+}

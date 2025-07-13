@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenAI Chat Assistant</title>
+  <link rel="stylesheet" href="./CSS/bootstrap.rtl.min.css">
+  <link rel="stylesheet" href="./CSS/style.css">
+  <script src="./JS/marked.min.js"></script>
+</head>
+<body>
+  <div class="chat-box d-flex flex-column">
+    <div class="chat-header">محادثة الذكاء الاصطناعي الخاص بنبع</div>
+    <div class="chat-messages" id="chatBox"></div>
+    <div class="chat-input" id="inputSection" style="display: none;">
+      <div class="mb-2">
+        <textarea class="form-control" id="messageInput" rows="2" placeholder="اكتب رسالتك..."></textarea>
+      </div>
+      <div class="d-flex justify-content-between align-items-center">
+        <input type="file" class="form-control form-control-sm w-50" id="imageInput" accept="image/*">
+        <div>
+          <button class="btn btn-primary btn-sm me-2" onclick="sendMessage()">📨 إرسال</button>
+        </div>
+      </div>
+    </div>
+    <div class="p-3 text-center" id="newChatSection">
+      <button class="btn btn-secondary" onclick="createNewThread()">🆕 محادثة جديدة</button>
+    </div>
+  </div>
+
+  <script src="./JS/script.js"></script>
+
+
+</body>
+</html>
