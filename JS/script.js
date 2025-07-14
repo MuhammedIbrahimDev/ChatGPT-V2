@@ -6,6 +6,11 @@ let threadId = localStorage.getItem("savedThreadId") || null;
 const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 
+function getParam(name) {
+  var match = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+  return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
 function appendMessage(role, htmlContent, isTemporary = false) {
 
   if (htmlContent.includes("<table")) {
