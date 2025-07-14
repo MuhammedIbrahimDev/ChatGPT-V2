@@ -1,4 +1,4 @@
-let apiKey = getParam("key") || "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";
+let apiKey = getParam("key")
 let assistantId = getParam("asst") || "asst_2bP9JIU6aYlumYAvb9VMf3f0";
 let threadId = localStorage.getItem("savedThreadId") || null;
 
