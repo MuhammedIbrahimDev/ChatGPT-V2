@@ -1,7 +1,6 @@
-let apiKey = getParam("key")
+let apiKey = getParam("key");
 let assistantId = getParam("asst") || "asst_2bP9JIU6aYlumYAvb9VMf3f0";
 let threadId = localStorage.getItem("savedThreadId") || null;
-
 
 const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
@@ -12,7 +11,6 @@ function getParam(name) {
 }
 
 function appendMessage(role, htmlContent, isTemporary = false) {
-
   if (htmlContent.includes("<table")) {
     htmlContent = `<div class="table-wrapper">${htmlContent}</div>`;
   }
@@ -30,8 +28,24 @@ function appendMessage(role, htmlContent, isTemporary = false) {
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
+async function getImageBase64(fileId) {
+  const response = await fetch(`https://api.openai.com/v1/files/${fileId}/content`, {
+    headers: {
+      "Authorization": `Bearer ${apiKey}`
+    }
+  });
+
+  const blob = await response.blob();
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result); // data:image/...;base64,...
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function fetchLastMessage() {
   if (!threadId) return;
+
   const res = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages?order=desc&limit=1`, {
     headers: {
       "Authorization": `Bearer ${apiKey}`,
@@ -39,22 +53,28 @@ async function fetchLastMessage() {
       "OpenAI-Beta": "assistants=v2"
     }
   });
+
   const data = await res.json();
   const messages = data.data;
   if (messages.length === 0) return;
+
   const msg = messages[0];
   const role = msg.role;
   let contentHtml = "";
-  msg.content.forEach(part => {
-    if (part.type === 'text') contentHtml += marked.parse(part.text.value);
-    if (part.type === 'image_file') {
-      const fileId = part.image_file.file_id;
-      const imageUrl = `https://api.openai.com/v1/files/${fileId}/content`;
-      contentHtml += `<img src="${imageUrl}" class="img-fluid rounded my-2" style="max-height:300px" />`;
+
+  for (const part of msg.content) {
+    if (part.type === 'text') {
+      contentHtml += marked.parse(part.text.value);
     }
-  });
+    if (part.type === 'image_file') {
+      const base64Image = await getImageBase64(part.image_file.file_id);
+      contentHtml += `<img src="${base64Image}" class="img-fluid rounded my-2" style="max-height:300px" />`;
+    }
+  }
+
   const loadingMsg = document.getElementById("loadingMessage");
   if (loadingMsg) loadingMsg.parentElement.remove();
+
   appendMessage(role, contentHtml);
 }
 
@@ -63,24 +83,26 @@ async function sendMessage() {
   const imageFile = document.getElementById("imageInput").files[0];
   const content = [];
 
-
   sendBtn.disabled = true;
   sendBtn.innerHTML = `<span class="loading-icon"></span>`;
-
 
   let contentHtml = "";
   if (imageFile) {
     const formData = new FormData();
     formData.append("file", imageFile);
-    formData.append("purpose", "assistants");
+    formData.append("purpose", "vision");
+
     const uploadRes = await fetch("https://api.openai.com/v1/files", {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}` },
       body: formData
     });
+
     const uploadData = await uploadRes.json();
     content.push({ type: "image_file", image_file: { file_id: uploadData.id } });
-    contentHtml += `<img src="https://api.openai.com/v1/files/${uploadData.id}/content" class="img-fluid rounded my-2" style="max-height:300px" />`;
+
+    const base64Image = await getImageBase64(uploadData.id);
+    contentHtml += `<img src="${base64Image}" class="img-fluid rounded my-2" style="max-height:300px" />`;
   }
 
   if (messageText !== "") {
@@ -120,6 +142,7 @@ async function sendMessage() {
   const runData = await runRes.json();
   const runId = runData.id;
   let status = "queued";
+
   while (!["completed", "failed", "cancelled"].includes(status)) {
     await new Promise(resolve => setTimeout(resolve, 1500));
     const checkRes = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runId}`, {
@@ -129,18 +152,17 @@ async function sendMessage() {
         "OpenAI-Beta": "assistants=v2"
       }
     });
+
     const checkData = await checkRes.json();
     status = checkData.status;
   }
 
   await fetchLastMessage();
 
-  // رجّع شكل الزر بعد المعالجة
   sendBtn.innerText = "إرسال";
   sendBtn.disabled = messageInput.value.trim() === "";
 }
 
-// إنشاء محادثة جديدة
 async function createNewThread() {
   const threadRes = await fetch("https://api.openai.com/v1/threads", {
     method: "POST",
@@ -151,6 +173,7 @@ async function createNewThread() {
     },
     body: "{}"
   });
+
   const threadData = await threadRes.json();
   threadId = threadData.id;
   localStorage.setItem("savedThreadId", threadId);
@@ -159,16 +182,13 @@ async function createNewThread() {
   document.getElementById("newChatSection").style.display = "none";
 }
 
-// عرض واجهة الكتابة إذا كان فيه محادثة محفوظة
 if (threadId) {
   document.getElementById("inputSection").style.display = "block";
   document.getElementById("newChatInputSection").style.display = "block";
   document.getElementById("newChatSection").style.display = "none";
-
   fetchAllMessages();
 }
 
-// 🔁 تفعيل/تعطيل الزر تلقائيًا أثناء الكتابة
 messageInput.addEventListener("input", () => {
   const isEmpty = messageInput.value.trim() === "";
   const isLoading = sendBtn.querySelector(".loading-icon") !== null;
@@ -176,24 +196,18 @@ messageInput.addEventListener("input", () => {
 });
 
 function startNewChat() {
-  // إغلاق المودال بالطريقة اليدوية
   const modalEl = document.getElementById("newChatModal");
 
-  // إزالة show و style
   modalEl.classList.remove("show");
   modalEl.setAttribute("aria-hidden", "true");
   modalEl.removeAttribute("aria-modal");
   modalEl.style.display = "none";
 
-  // حذف الـ backdrop
   document.querySelectorAll(".modal-backdrop").forEach(el => el.remove());
-
-  // استرجاع body لطبيعته
   document.body.classList.remove("modal-open");
   document.body.style.paddingRight = '';
   document.body.style.overflow = '';
 
-  // إفراغ الرسائل وبداية محادثة جديدة
   document.getElementById("chatBox").innerHTML = "";
   createNewThread();
 }
@@ -212,18 +226,19 @@ async function fetchAllMessages() {
   const data = await res.json();
   const messages = data.data;
 
-  for (const msg of messages.reverse()) {  // الترتيب من الأقدم للأحدث
+  for (const msg of messages.reverse()) {
     const role = msg.role;
     let contentHtml = "";
 
-    msg.content.forEach(part => {
-      if (part.type === 'text') contentHtml += marked.parse(part.text.value);
-      if (part.type === 'image_file') {
-        const fileId = part.image_file.file_id;
-        const imageUrl = `https://api.openai.com/v1/files/${fileId}/content`;
-        contentHtml += `<img src="${imageUrl}" class="img-fluid rounded my-2" style="max-height:300px" />`;
+    for (const part of msg.content) {
+      if (part.type === 'text') {
+        contentHtml += marked.parse(part.text.value);
       }
-    });
+      if (part.type === 'image_file') {
+        const base64Image = await getImageBase64(part.image_file.file_id);
+        contentHtml += `<img src="${base64Image}" class="img-fluid rounded my-2" style="max-height:300px" />`;
+      }
+    }
 
     appendMessage(role, contentHtml);
   }
