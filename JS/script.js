@@ -1,9 +1,38 @@
-let apiKey = getParam("key");
+let apiKey = getParam("key") ;
 let assistantId = getParam("asst") || "asst_2bP9JIU6aYlumYAvb9VMf3f0";
 let threadId = localStorage.getItem("savedThreadId") || null;
 
 const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
+
+  messageInput.addEventListener("keydown", function (event) {
+    // لما يضغط Enter بدون Shift
+    if (event.key === "Enter" && !event.shiftKey) {
+      // التأكد إن فيه محتوى مكتوب (مش مسافات فقط)
+      if (messageInput.value.trim() !== "") {
+        event.preventDefault(); // يمنع عمل سطر جديد
+        if (!sendBtn.disabled) {
+          sendMessage(); // ينفذ الإرسال
+        }
+      }
+    }
+  });
+
+const imageInput = document.getElementById('imageInput');
+const fileInput = document.getElementById('fileInput');
+const fileName = document.getElementById('fileName');
+
+imageInput.addEventListener('change', () => {
+  if (imageInput.files && imageInput.files.length) {
+    fileName.textContent = imageInput.files[0].name;
+  }
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files && fileInput.files.length) {
+    fileName.textContent = fileInput.files[0].name;
+  }
+});
 
 function getParam(name) {
   var match = new RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
@@ -64,6 +93,21 @@ async function fetchLastMessage() {
 
   for (const part of msg.content) {
     if (part.type === 'text') {
+
+      if (part.text.annotations && part.text.annotations.length > 0) {
+      part.text.annotations.forEach(ann => {
+        if (ann.type === "file_path" && ann.file_path?.file_id) {
+          const fileId = ann.file_path.file_id;
+          const fileName = ann.text.split("/").pop() || "downloaded_file";
+
+          // بدل الرابط المباشر نخلي الرابط يستدعي الدالة
+          const jsLink = `<a href="javascript:downloadFromOpenAI('${fileId}', '${fileName}')">${fileName}</a>`;
+
+          part.text.value = part.text.value.replace(ann.text, jsLink);
+        }
+      });
+    }
+
       contentHtml += marked.parse(part.text.value);
     }
     if (part.type === 'image_file') {
@@ -81,12 +125,16 @@ async function fetchLastMessage() {
 async function sendMessage() {
   const messageText = messageInput.value.trim();
   const imageFile = document.getElementById("imageInput").files[0];
+  const otherFile = document.getElementById("fileInput").files[0];
   const content = [];
+  let attachments = [];
 
   sendBtn.disabled = true;
   sendBtn.innerHTML = `<span class="loading-icon"></span>`;
 
   let contentHtml = "";
+
+  // رفع صورة من imageInput (vision)
   if (imageFile) {
     const formData = new FormData();
     formData.append("file", imageFile);
@@ -105,19 +153,54 @@ async function sendMessage() {
     contentHtml += `<img src="${base64Image}" class="img-fluid rounded my-2" style="max-height:300px" />`;
   }
 
+  // رفع ملف عام من fileInput كـ attachment
+  if (otherFile) {
+    const formData = new FormData();
+    formData.append("file", otherFile);
+    formData.append("purpose", "assistants");
+
+    const uploadRes = await fetch("https://api.openai.com/v1/files", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}` },
+      body: formData
+    });
+
+    const uploadData = await uploadRes.json();
+    attachments.push({
+      file_id: uploadData.id,
+      tools: [{ type: "code_interpreter" }] // ممكن تغير الأداة حسب الاستخدام
+    });
+
+    contentHtml += `<div class="file-attachment my-2 p-2 border rounded bg-light">
+                      📄 ${otherFile.name}
+                    </div>`;
+  }
+
+  // نص الرسالة
   if (messageText !== "") {
     content.push({ type: "text", text: messageText });
     contentHtml += marked.parse(messageText);
   }
 
-  if (content.length === 0) return;
+  if (content.length === 0 && attachments.length === 0) {
+    sendBtn.innerText = "إرسال";
+    sendBtn.disabled = messageInput.value.trim() === "";
+    return;
+  }
 
   appendMessage("user", contentHtml);
   appendMessage("assistant", "⏳ جاري المعالجة...", true);
 
   messageInput.value = "";
   document.getElementById("imageInput").value = "";
+  document.getElementById("fileInput").value = "";
   sendBtn.disabled = true;
+
+  // إرسال المحتوى
+  let messagePayload = { role: "user", content };
+  if (attachments.length > 0) {
+    messagePayload.attachments = attachments;
+  }
 
   await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
     method: "POST",
@@ -126,9 +209,10 @@ async function sendMessage() {
       "Content-Type": "application/json",
       "OpenAI-Beta": "assistants=v2"
     },
-    body: JSON.stringify({ role: "user", content })
+    body: JSON.stringify(messagePayload)
   });
 
+  // تشغيل الـ run
   const runRes = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
     method: "POST",
     headers: {
@@ -161,7 +245,10 @@ async function sendMessage() {
 
   sendBtn.innerText = "إرسال";
   sendBtn.disabled = messageInput.value.trim() === "";
+  fileName.textContent = ""
 }
+
+
 
 async function createNewThread() {
   const threadRes = await fetch("https://api.openai.com/v1/threads", {
@@ -232,6 +319,20 @@ async function fetchAllMessages() {
 
     for (const part of msg.content) {
       if (part.type === 'text') {
+        if (part.text.annotations && part.text.annotations.length > 0) {
+      part.text.annotations.forEach(ann => {
+        if (ann.type === "file_path" && ann.file_path?.file_id) {
+          const fileId = ann.file_path.file_id;
+          const fileName = ann.text.split("/").pop() || "downloaded_file";
+
+          // بدل الرابط المباشر نخلي الرابط يستدعي الدالة
+          const jsLink = `<a href="javascript:downloadFromOpenAI('${fileId}', '${fileName}')">${fileName}</a>`;
+
+          part.text.value = part.text.value.replace(ann.text, jsLink);
+        }
+      });
+    }
+        
         contentHtml += marked.parse(part.text.value);
       }
       if (part.type === 'image_file') {
@@ -242,4 +343,30 @@ async function fetchAllMessages() {
 
     appendMessage(role, contentHtml);
   }
+}
+
+
+function downloadFromOpenAI(fileId, fileName) {
+  fetch(`https://api.openai.com/v1/files/${fileId}/content`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}` // خليها من السيرفر أو env
+    }
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Download failed");
+    return res.blob();
+  })
+  .then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  })
+  .catch(err => {
+    console.error("Error downloading file:", err);
+  });
 }
