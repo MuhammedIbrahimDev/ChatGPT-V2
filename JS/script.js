@@ -1,4 +1,4 @@
-let apiKey = getParam("key") ;
+let apiKey = getParam("key") 
 let assistantId = getParam("asst") || "asst_2bP9JIU6aYlumYAvb9VMf3f0";
 let threadId = localStorage.getItem("savedThreadId") || null;
 
@@ -21,6 +21,47 @@ const sendBtn = document.getElementById("sendBtn");
 const imageInput = document.getElementById('imageInput');
 const fileInput = document.getElementById('fileInput');
 const fileName = document.getElementById('fileName');
+const clearFile = document.getElementById('clearFile');
+const imageLabel = document.querySelector('label[for="imageInput"]');
+const fileLabel = document.querySelector('label[for="fileInput"]');
+
+function showFileName(name) {
+  fileName.textContent = name;
+  clearFile.style.display = "inline";
+}
+
+function clearSelectedFile() {
+  fileName.textContent = "";
+  clearFile.style.display = "none";
+  imageInput.value = "";
+  fileInput.value = "";
+  imageInput.disabled = false;
+  fileInput.disabled = false;
+  imageLabel.classList.remove('disabled-btn');
+  fileLabel.classList.remove('disabled-btn');
+}
+
+clearFile.addEventListener('click', clearSelectedFile);
+
+imageInput.addEventListener('change', () => {
+  if (imageInput.files && imageInput.files.length) {
+    showFileName(imageInput.files[0].name);
+    fileInput.disabled = true;
+    fileLabel.classList.add('disabled-btn'); // disable file button
+    imageLabel.classList.remove('disabled-btn');
+  }
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files && fileInput.files.length) {
+    showFileName(fileInput.files[0].name);
+    imageInput.disabled = true;
+    imageLabel.classList.add('disabled-btn'); // disable image button
+    fileLabel.classList.remove('disabled-btn');
+  }
+});
+
+
 
 imageInput.addEventListener('change', () => {
   if (imageInput.files && imageInput.files.length) {
@@ -246,6 +287,12 @@ async function sendMessage() {
   sendBtn.innerText = "إرسال";
   sendBtn.disabled = messageInput.value.trim() === "";
   fileName.textContent = ""
+  fileName.textContent = "";
+  clearFile.style.display = "none";
+  imageInput.disabled = false;
+  fileInput.disabled = false;
+  imageLabel.classList.remove('disabled-btn');
+fileLabel.classList.remove('disabled-btn');
 }
 
 
@@ -338,6 +385,26 @@ async function fetchAllMessages() {
       if (part.type === 'image_file') {
         const base64Image = await getImageBase64(part.image_file.file_id);
         contentHtml += `<img src="${base64Image}" class="img-fluid rounded my-2" style="max-height:300px" />`;
+      }
+      if (msg.attachments && msg.attachments.length > 0) {
+        for (const attachment of msg.attachments) {
+          if (attachment.file_id) {
+            const fileId = attachment.file_id;
+
+            // Get the file metadata from OpenAI to get the original file name
+            const fileMetaRes = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
+              headers: { "Authorization": `Bearer ${apiKey}` }
+            });
+            const fileMeta = await fileMetaRes.json();
+            const fileName = fileMeta.filename || "downloaded_file";
+
+            contentHtml += `
+              <div class="file-attachment my-2 p-2 border rounded bg-light">
+                📄 ${fileName}
+              </div>
+            `;
+          }
+        }
       }
     }
 

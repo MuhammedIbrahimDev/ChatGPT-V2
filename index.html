@@ -51,7 +51,12 @@
   </label>
 
   <!-- optional: show chosen filename -->
-  <small id="fileName" class="text-truncate" style="max-width:140px;direction:ltr;"></small>
+   <span id="clearFile" style="cursor:pointer; color:red; display:none;"> ✖</span>
+  <small id="fileName" class="text-truncate" style="max-width:140px;direction:ltr;">
+  <span id="fileNameText"></span>
+  
+</small>
+
 </div>
         <div>
           <button class="btn btn-primary btn-sm fixed-send-btn" disabled id="sendBtn" onclick="sendMessage()">إرسال</button>
