@@ -1,22 +1,22 @@
-let apiKey = getParam("key") 
+let apiKey = getParam("key")
 let assistantId = getParam("asst") || "asst_2bP9JIU6aYlumYAvb9VMf3f0";
 let threadId = localStorage.getItem("savedThreadId") || null;
 
 const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
 
-  messageInput.addEventListener("keydown", function (event) {
-    // لما يضغط Enter بدون Shift
-    if (event.key === "Enter" && !event.shiftKey) {
-      // التأكد إن فيه محتوى مكتوب (مش مسافات فقط)
-      if (messageInput.value.trim() !== "") {
-        event.preventDefault(); // يمنع عمل سطر جديد
-        if (!sendBtn.disabled) {
-          sendMessage(); // ينفذ الإرسال
-        }
+messageInput.addEventListener("keydown", function (event) {
+  // لما يضغط Enter بدون Shift
+  if (event.key === "Enter" && !event.shiftKey) {
+    // التأكد إن فيه محتوى مكتوب (مش مسافات فقط)
+    if (messageInput.value.trim() !== "") {
+      event.preventDefault(); // يمنع عمل سطر جديد
+      if (!sendBtn.disabled) {
+        sendMessage(); // ينفذ الإرسال
       }
     }
-  });
+  }
+});
 
 const imageInput = document.getElementById('imageInput');
 const fileInput = document.getElementById('fileInput');
@@ -80,6 +80,76 @@ function getParam(name) {
   return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
 }
 
+const T = {
+  ar: {
+    send: "إرسال",
+    processing: "⏳ جاري المعالجة...",
+    newChat: "🆕 محادثة جديدة",
+    confirmNewChat: "بدء محادثة جديدة",
+    confirmMessage: "هل أنت متأكد أنك تريد بدء محادثة جديدة؟ سيتم مسح المحادثة الحالية.",
+    yes: "نعم",
+    no: "لا",
+    placeholder: "اكتب رسالتك...",
+    attachFile: "إرفاق ملف",
+    uploadImage: "رفع صورة",
+    assistantName: "(المحترف) ChatGPT 🤖",
+    fileUploaded: "تم رفع ملف",
+    analyzeFilePrompt: "ما هي التقارير والرسومات البيانيه التى يمكنك استخراجها من الملف {file} بشكل تحليلي مفصل بدون أسماء الحقول"
+  },
+
+  en: {
+    send: "Send",
+    processing: "⏳ Processing...",
+    newChat: "🆕 New Chat",
+    confirmNewChat: "Start New Chat",
+    confirmMessage: "Are you sure you want to start a new chat? The current conversation will be cleared.",
+    yes: "Yes",
+    no: "No",
+    placeholder: "Type your message...",
+    attachFile: "Attach File",
+    uploadImage: "Upload Image",
+    assistantName: "ChatGPT Pro 🤖",
+    fileUploaded: "File uploaded",
+    analyzeFilePrompt: "What reports and charts can you generate from the file {file}? Provide a detailed analytical breakdown without mentioning field names."
+  }
+};
+
+const txt = lang == 2 ? T.en : T.ar;
+
+function applyLanguage() {
+
+  document.documentElement.lang = lang == 2 ? "en" : "ar";
+  document.documentElement.dir = lang == 2 ? "ltr" : "rtl";
+
+  document.title = txt.assistantName;
+
+  document.getElementById("sendBtn").innerText = txt.send;
+
+  document.getElementById("messageInput").placeholder = txt.placeholder;
+
+  document.getElementById("newChatSection").querySelector("button").innerText = txt.newChat;
+
+  document.getElementById("newChatInputSection").innerText = txt.newChat;
+
+  document.getElementById("newChatModalLabel").innerText = txt.confirmNewChat;
+
+  document.querySelector("#newChatModal .modal-body").innerText = txt.confirmMessage;
+
+  document.querySelector('[data-bs-dismiss="modal"]').innerText = txt.no;
+
+  document.querySelector('#newChatModal .btn-secondary.fs-6').innerText = txt.yes;
+
+  document.querySelector(".chat-header div").innerText = txt.assistantName;
+
+  const imageBtn = document.querySelector('label[for="imageInput"]');
+  imageBtn.title = txt.uploadImage;
+  imageBtn.setAttribute("aria-label", txt.uploadImage);
+
+  const fileBtn = document.querySelector('label[for="fileInput"]');
+  fileBtn.title = txt.attachFile;
+  fileBtn.setAttribute("aria-label", txt.attachFile);
+}
+
 function appendMessage(role, htmlContent, isTemporary = false) {
   if (htmlContent.includes("<table")) {
     htmlContent = `<div class="table-wrapper">${htmlContent}</div>`;
@@ -136,18 +206,18 @@ async function fetchLastMessage() {
     if (part.type === 'text') {
 
       if (part.text.annotations && part.text.annotations.length > 0) {
-      part.text.annotations.forEach(ann => {
-        if (ann.type === "file_path" && ann.file_path?.file_id) {
-          const fileId = ann.file_path.file_id;
-          const fileName = ann.text.split("/").pop() || "downloaded_file";
+        part.text.annotations.forEach(ann => {
+          if (ann.type === "file_path" && ann.file_path?.file_id) {
+            const fileId = ann.file_path.file_id;
+            const fileName = ann.text.split("/").pop() || "downloaded_file";
 
-          // بدل الرابط المباشر نخلي الرابط يستدعي الدالة
-          const jsLink = `<a href="javascript:downloadFromOpenAI('${fileId}', '${fileName}')">${fileName}</a>`;
+            // بدل الرابط المباشر نخلي الرابط يستدعي الدالة
+            const jsLink = `<a href="javascript:downloadFromOpenAI('${fileId}', '${fileName}')">${fileName}</a>`;
 
-          part.text.value = part.text.value.replace(ann.text, jsLink);
-        }
-      });
-    }
+            part.text.value = part.text.value.replace(ann.text, jsLink);
+          }
+        });
+      }
 
       contentHtml += marked.parse(part.text.value);
     }
@@ -212,7 +282,7 @@ async function sendMessage() {
       tools: [{ type: "code_interpreter" }] // ممكن تغير الأداة حسب الاستخدام
     });
 
-    contentHtml += `<div class="file-attachment my-2 p-2 border rounded bg-light">
+    contentHtml += `<div class="file-attachment my-2 p-2 border rounded bg-light text-dark">
                       📄 ${otherFile.name}
                     </div>`;
   }
@@ -224,13 +294,13 @@ async function sendMessage() {
   }
 
   if (content.length === 0 && attachments.length === 0) {
-    sendBtn.innerText = "إرسال";
+    sendBtn.innerText = txt.send;
     sendBtn.disabled = messageInput.value.trim() === "";
     return;
   }
 
   appendMessage("user", contentHtml);
-  appendMessage("assistant", "⏳ جاري المعالجة...", true);
+  appendMessage("assistant", txt.processing, true);
 
   messageInput.value = "";
   document.getElementById("imageInput").value = "";
@@ -284,7 +354,7 @@ async function sendMessage() {
 
   await fetchLastMessage();
 
-  sendBtn.innerText = "إرسال";
+  sendBtn.innerText = txt.send;
   sendBtn.disabled = messageInput.value.trim() === "";
   fileName.textContent = ""
   fileName.textContent = "";
@@ -292,8 +362,55 @@ async function sendMessage() {
   imageInput.disabled = false;
   fileInput.disabled = false;
   imageLabel.classList.remove('disabled-btn');
-fileLabel.classList.remove('disabled-btn');
+  fileLabel.classList.remove('disabled-btn');
 }
+// async function fetchLastMessage() {
+//   if (!threadId) return;
+
+//   const res = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages?order=desc&limit=1`, {
+//     headers: {
+//       "Authorization": `Bearer ${apiKey}`,
+//       "Content-Type": "application/json",
+//       "OpenAI-Beta": "assistants=v2"
+//     }
+//   });
+
+//   const data = await res.json();
+//   const messages = data.data;
+//   if (messages.length === 0) return;
+
+//   const msg = messages[0];
+//   const role = msg.role;
+//   let contentHtml = "";
+
+//   for (const part of msg.content) {
+//     if (part.type === 'text') {
+//       if (part.text.annotations && part.text.annotations.length > 0) {
+//         part.text.annotations.forEach(ann => {
+//           if (ann.type === "file_path" && ann.file_path?.file_id) {
+//             const fileId = ann.file_path.file_id;
+//             const fileName = ann.text.split("/").pop() || "downloaded_file";
+
+//             const jsLink = `<a href="javascript:downloadFromOpenAI('${fileId}', '${fileName}')">${fileName}</a>`;
+
+//             part.text.value = part.text.value.replace(ann.text, jsLink);
+//           }
+//         });
+//       }
+//       contentHtml += marked.parse(part.text.value);
+//     }
+//     if (part.type === 'image_file') {
+//       const base64Image = await getImageBase64(part.image_file.file_id);
+//       contentHtml += `<img src="${base64Image}" class="img-fluid rounded my-2" style="max-height:300px" />`;
+//     }
+//   }
+
+//   // إزالة رسالة "جاري المعالجة..." لو موجودة
+//   const loadingMsg = document.getElementById("loadingMessage");
+//   if (loadingMsg) loadingMsg.parentElement.remove();
+
+//   appendMessage(role, contentHtml);
+// }
 
 
 
@@ -367,19 +484,19 @@ async function fetchAllMessages() {
     for (const part of msg.content) {
       if (part.type === 'text') {
         if (part.text.annotations && part.text.annotations.length > 0) {
-      part.text.annotations.forEach(ann => {
-        if (ann.type === "file_path" && ann.file_path?.file_id) {
-          const fileId = ann.file_path.file_id;
-          const fileName = ann.text.split("/").pop() || "downloaded_file";
+          part.text.annotations.forEach(ann => {
+            if (ann.type === "file_path" && ann.file_path?.file_id) {
+              const fileId = ann.file_path.file_id;
+              const fileName = ann.text.split("/").pop() || "downloaded_file";
 
-          // بدل الرابط المباشر نخلي الرابط يستدعي الدالة
-          const jsLink = `<a href="javascript:downloadFromOpenAI('${fileId}', '${fileName}')">${fileName}</a>`;
+              // بدل الرابط المباشر نخلي الرابط يستدعي الدالة
+              const jsLink = `<a href="javascript:downloadFromOpenAI('${fileId}', '${fileName}')">${fileName}</a>`;
 
-          part.text.value = part.text.value.replace(ann.text, jsLink);
+              part.text.value = part.text.value.replace(ann.text, jsLink);
+            }
+          });
         }
-      });
-    }
-        
+
         contentHtml += marked.parse(part.text.value);
       }
       if (part.type === 'image_file') {
@@ -399,7 +516,7 @@ async function fetchAllMessages() {
             const fileName = fileMeta.filename || "downloaded_file";
 
             contentHtml += `
-              <div class="file-attachment my-2 p-2 border rounded bg-light">
+              <div class="file-attachment my-2 p-2 border rounded bg-light text-dark">
                 📄 ${fileName}
               </div>
             `;
@@ -419,21 +536,180 @@ function downloadFromOpenAI(fileId, fileName) {
       Authorization: `Bearer ${apiKey}` // خليها من السيرفر أو env
     }
   })
-  .then(res => {
-    if (!res.ok) throw new Error("Download failed");
-    return res.blob();
-  })
-  .then(blob => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  })
-  .catch(err => {
-    console.error("Error downloading file:", err);
+    .then(res => {
+      if (!res.ok) throw new Error("Download failed");
+      return res.blob();
+    })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+      console.error("Error downloading file:", err);
+    });
+}
+
+async function handleUploadedFile(fileId) {
+  console.log("File uploaded with ID:", fileId);
+  const name = await getFilename(fileId);
+  // عرض رسالة المستخدم التي أرسلها مع الملف (تستطيع تعديل النص لو أردت)
+  appendMessage("user", `<div>${txt.fileUploaded}: <strong>${name}</strong></div>`);
+  appendMessage("assistant", txt.processing, true);
+
+  // إرسال الرسالة التي تحتوي الملف للتحليل
+  const msgResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "OpenAI-Beta": "assistants=v2",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: txt.analyzeFilePrompt.replace("{file}", name)
+        }
+      ],
+      attachments: [
+        {
+          file_id: fileId,
+          tools: [{ type: "code_interpreter" }]
+        }
+      ]
+    })
+  });
+
+  const msgData = await msgResp.json();
+  console.log("Message response:", msgData);
+
+  // بدء الـ run للتحليل
+  const runResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "OpenAI-Beta": "assistants=v2",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      assistant_id: assistantId
+    })
+  });
+
+  const runData = await runResp.json();
+
+  // متابعة حالة الـ run وعند اكتماله يتم جلب آخر رسالة وعرضها
+  pollRunStatus(threadId, runData.id);
+}
+
+
+// دالة لمتابعة حالة الـ run
+
+function displayMessage(sender, message) {
+  const chatMessages = document.getElementById("chatMessages");
+  const messageElement = document.createElement("div");
+  messageElement.classList.add("message", sender);
+
+  const icon = document.createElement("div");
+  icon.classList.add("icon");
+  icon.textContent = sender === "user" ? "🧑" : "🤖";
+
+  const text = document.createElement("div");
+  text.classList.add("text");
+  text.innerHTML = message;
+
+  messageElement.appendChild(icon);
+  messageElement.appendChild(text);
+  chatMessages.appendChild(messageElement);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+async function loadMessages(threadId) {
+  const msgListResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
+    method: "GET",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "OpenAI-Beta": "assistants=v2"
+    }
+  });
+  const messagesData = await msgListResp.json();
+  const messages = messagesData.data;
+
+  messages.forEach(msg => {
+    let role = msg.role;
+    let contentHtml = ""; // لازم تهيئه هنا لكل رسالة قبل ملئه
+
+    msg.content.forEach(part => {
+      if (part.type === 'text') {
+        contentHtml += part.text.value; // مثال، أو استخدم marked.parse(part.text.value) لو تستخدم Markdown
+      }
+      // هنا تكمل معالجة أنواع المحتوى الثانية (image_file، إلخ) حسب الحاجة
+    });
+    appendMessage("user", contentHtml);
+    appendMessage("assistant", txt.processing, true);
+    appendMessage(role, contentHtml);
   });
 }
+
+// تعديل pollRunStatus لعرض الرسائل فور انتهاء الـ run
+async function pollRunStatus(threadId, runId) {
+  let runStatus = null;
+
+  do {
+    const runResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${runId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "OpenAI-Beta": "assistants=v2"
+      }
+    });
+
+    const runData = await runResp.json();
+    runStatus = runData.status;
+    console.log("Run status:", runStatus);
+
+    if (runStatus === "in_progress" || runStatus === "queued") {
+      await new Promise(r => setTimeout(r, 1500)); // تأخير
+    }
+
+  } while (runStatus === "in_progress" || runStatus === "queued");
+
+  if (runStatus === "completed") {
+    console.log("Run completed. Fetching last message...");
+    // إزالة رسالة "جاري المعالجة..."
+    const loadingMsg = document.getElementById("loadingMessage");
+    if (loadingMsg) loadingMsg.parentElement.remove();
+
+    // عرض آخر رسالة من المساعد فقط (الرد الجديد)
+    await fetchLastMessage();
+  }
+}
+async function getFilename(fileId) {
+  try {
+    const res = await fetch(`https://api.openai.com/v1/files/${fileId}`, {
+      headers: {
+        "Authorization": `Bearer ${apiKey}`
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP error! Status: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.filename;
+  } catch (err) {
+    console.error("Error fetching filename:", err);
+    return null;
+  }
+}
+
+applyLanguage();
+// Example:
+//getFilename("file-KjGEGqNnnbmcTSysM6ghuH").then(name => console.log(name));
