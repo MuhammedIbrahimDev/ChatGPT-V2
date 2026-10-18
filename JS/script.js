@@ -6,8 +6,7 @@
 
 const API_BASE = "https://api.openai.com/v1";
 
-const apiKey = getParam("key") 
-
+const apiKey = getParam("key") ;
 const lang = getParam("lang") || "1";
 
 const MODEL = getParam("model") || "gpt-4.1-mini";
