@@ -6,22 +6,23 @@
 
 const API_BASE = "https://api.openai.com/v1";
 
-const apiKey = getParam("key");
+const apiKey = getParam("key") 
+
 const lang = getParam("lang") || "1";
 
 const MODEL = getParam("model") || "gpt-4.1-mini";
 
-let conversationId =
-  localStorage.getItem("savedConversationId") || null;
+let conversationId = localStorage.getItem("savedConversationId") || null;
 
 let isProcessing = false;
+let pendingExternalFile = null;
 
 /*
    Assistants API has been retired.
    Remove the obsolete saved thread identifier.
 */
-localStorage.removeItem("savedThreadId");
 
+localStorage.removeItem("savedThreadId");
 
 /* =========================================================
    2. DOM Elements
@@ -36,22 +37,16 @@ const fileInput = document.getElementById("fileInput");
 const fileName = document.getElementById("fileName");
 const clearFile = document.getElementById("clearFile");
 
-const imageLabel = document.querySelector(
-  'label[for="imageInput"]'
-);
+const imageLabel = document.querySelector('label[for="imageInput"]');
 
-const fileLabel = document.querySelector(
-  'label[for="fileInput"]'
-);
+const fileLabel = document.querySelector('label[for="fileInput"]');
 
 const chatBox = document.getElementById("chatBox");
 const inputSection = document.getElementById("inputSection");
 
 const newChatSection = document.getElementById("newChatSection");
-const newChatInputSection = document.getElementById(
-  "newChatInputSection"
-);
 
+const newChatInputSection = document.getElementById("newChatInputSection");
 
 /* =========================================================
    3. Language
@@ -86,32 +81,23 @@ const T = {
     missingKey:
       "لم يتم العثور على مفتاح API. أضف المفتاح إلى عنوان الصفحة باستخدام key.",
 
-    connectionError:
-      "حدث خطأ أثناء الاتصال بالخدمة.",
+    connectionError: "حدث خطأ أثناء الاتصال بالخدمة.",
 
-    emptyResponse:
-      "لم يرجع النموذج أي نص في هذه الاستجابة.",
+    emptyResponse: "لم يرجع النموذج أي نص في هذه الاستجابة.",
 
-    uploadError:
-      "تعذر رفع الملف.",
+    uploadError: "تعذر رفع الملف.",
 
-    downloadError:
-      "تعذر تنزيل الملف.",
+    downloadError: "تعذر تنزيل الملف.",
 
-    unsupported:
-      "نوع الملف غير مدعوم لهذه العملية.",
+    unsupported: "نوع الملف غير مدعوم لهذه العملية.",
 
-    newConversationError:
-      "تعذر إنشاء محادثة جديدة.",
+    newConversationError: "تعذر إنشاء محادثة جديدة.",
 
-    retry:
-      "حاول مرة أخرى.",
+    retry: "حاول مرة أخرى.",
 
-    fileLabel:
-      "الملف المرفق",
+    fileLabel: "الملف المرفق",
 
-    imageLabel:
-      "الصورة المرفقة"
+    imageLabel: "الصورة المرفقة",
   },
 
   en: {
@@ -139,40 +125,29 @@ const T = {
     analyzeFilePrompt:
       "Analyze the attached file {file} in detail. Suggest suitable reports and charts, identify important findings, patterns, and conclusions, and generate charts or downloadable files when appropriate. Avoid mentioning technical field names unless necessary.",
 
-    missingKey:
-      "No API key was found. Add the key to the page URL using key.",
+    missingKey: "No API key was found. Add the key to the page URL using key.",
 
-    connectionError:
-      "An error occurred while connecting to the service.",
+    connectionError: "An error occurred while connecting to the service.",
 
-    emptyResponse:
-      "The model returned no text in this response.",
+    emptyResponse: "The model returned no text in this response.",
 
-    uploadError:
-      "The file could not be uploaded.",
+    uploadError: "The file could not be uploaded.",
 
-    downloadError:
-      "The file could not be downloaded.",
+    downloadError: "The file could not be downloaded.",
 
-    unsupported:
-      "The file type is not supported for this operation.",
+    unsupported: "The file type is not supported for this operation.",
 
-    newConversationError:
-      "Could not create a new conversation.",
+    newConversationError: "Could not create a new conversation.",
 
-    retry:
-      "Please try again.",
+    retry: "Please try again.",
 
-    fileLabel:
-      "Attached file",
+    fileLabel: "Attached file",
 
-    imageLabel:
-      "Attached image"
-  }
+    imageLabel: "Attached image",
+  },
 };
 
 const txt = lang === "2" ? T.en : T.ar;
-
 
 /* =========================================================
    4. Instructions
@@ -181,7 +156,6 @@ const txt = lang === "2" ? T.en : T.ar;
 /*
    The old Assistant's private instructions are not available
    in the supplied JavaScript.
-
    These are replacement instructions. Edit them as needed.
 */
 
@@ -207,7 +181,6 @@ When a user uploads an image:
 Format responses using Markdown when useful.
 `;
 
-
 /* =========================================================
    5. General Helpers
 ========================================================= */
@@ -216,7 +189,6 @@ function getParam(name) {
   return new URLSearchParams(window.location.search).get(name);
 }
 
-
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, function (char) {
     const map = {
@@ -224,18 +196,16 @@ function escapeHtml(value) {
       "<": "&lt;",
       ">": "&gt;",
       '"': "&quot;",
-      "'": "&#039;"
+      "'": "&#039;",
     };
 
     return map[char];
   });
 }
 
-
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
 
 function getErrorMessage(data) {
   if (data?.error?.message) {
@@ -249,7 +219,6 @@ function getErrorMessage(data) {
   return txt.connectionError;
 }
 
-
 function renderMarkdown(text) {
   if (typeof marked !== "undefined") {
     return marked.parse(String(text ?? ""));
@@ -258,34 +227,36 @@ function renderMarkdown(text) {
   return escapeHtml(text).replace(/\n/g, "<br>");
 }
 
-
 /* =========================================================
    6. API Request Helper
 ========================================================= */
 
 async function apiRequest(
   endpoint,
-  options = {}
+
+  options = {},
 ) {
   if (!apiKey) {
     throw new Error(txt.missingKey);
   }
 
   const headers = {
-    "Authorization": `Bearer ${apiKey}`,
-    ...(options.headers || {})
+    Authorization: `Bearer ${apiKey}`,
+
+    ...(options.headers || {}),
   };
 
   const response = await fetch(
     `${API_BASE}${endpoint}`,
+
     {
       ...options,
-      headers
-    }
+
+      headers,
+    },
   );
 
-  const contentType =
-    response.headers.get("content-type") || "";
+  const contentType = response.headers.get("content-type") || "";
 
   let data;
 
@@ -296,14 +267,11 @@ async function apiRequest(
   }
 
   if (!response.ok) {
-    throw new Error(
-      getErrorMessage(data)
-    );
+    throw new Error(getErrorMessage(data));
   }
 
   return data;
 }
-
 
 /* =========================================================
    7. Upload Files
@@ -324,10 +292,10 @@ async function uploadFile(file) {
 
   return await apiRequest("/files", {
     method: "POST",
-    body: formData
+
+    body: formData,
   });
 }
-
 
 /* =========================================================
    8. File Name UI
@@ -337,7 +305,6 @@ function showFileName(name) {
   fileName.textContent = name;
   clearFile.style.display = "inline";
 }
-
 
 function clearSelectedFile() {
   imageInput.value = "";
@@ -353,9 +320,7 @@ function clearSelectedFile() {
   clearFile.style.display = "none";
 }
 
-
 clearFile.addEventListener("click", clearSelectedFile);
-
 
 imageInput.addEventListener("change", function () {
   if (!imageInput.files || !imageInput.files.length) {
@@ -370,7 +335,6 @@ imageInput.addEventListener("change", function () {
   imageLabel.classList.remove("disabled-btn");
 });
 
-
 fileInput.addEventListener("change", function () {
   if (!fileInput.files || !fileInput.files.length) {
     return;
@@ -384,7 +348,6 @@ fileInput.addEventListener("change", function () {
   fileLabel.classList.remove("disabled-btn");
 });
 
-
 /* =========================================================
    9. Message UI
 ========================================================= */
@@ -392,20 +355,16 @@ fileInput.addEventListener("change", function () {
 function appendMessage(
   role,
   htmlContent,
-  isTemporary = false
+
+  isTemporary = false,
 ) {
   if (htmlContent.includes("<table")) {
-    htmlContent =
-      `<div class="table-wrapper">${htmlContent}</div>`;
+    htmlContent = `<div class="table-wrapper">${htmlContent}</div>`;
   }
 
   const bubble = document.createElement("div");
 
-  bubble.className =
-    `bubble ${role === "user"
-      ? "user-msg"
-      : "assistant-msg"
-    }`;
+  bubble.className = `bubble ${role === "user" ? "user-msg" : "assistant-msg"}`;
 
   bubble.innerHTML = htmlContent;
 
@@ -426,23 +385,21 @@ function appendMessage(
   return bubble;
 }
 
-
 function removeLoadingMessage() {
-  const loadingMessage =
-    document.getElementById("loadingMessage");
+  const loadingMessage = document.getElementById("loadingMessage");
 
   if (loadingMessage) {
     loadingMessage.parentElement.remove();
   }
 }
 
-
 function showError(message) {
   removeLoadingMessage();
 
   appendMessage(
     "assistant",
-    `<div class="text-danger">${escapeHtml(message)}</div>`
+
+    `<div class="text-danger">${escapeHtml(message)}</div>`,
   );
 }
 
@@ -468,6 +425,7 @@ function fileToDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
+
 /* =========================================================
    10. Image Preview
 ========================================================= */
@@ -481,8 +439,7 @@ function previewImage(file) {
 
       image.src = reader.result;
 
-      image.className =
-        "img-fluid rounded my-2";
+      image.className = "img-fluid rounded my-2";
 
       image.style.maxHeight = "300px";
 
@@ -497,7 +454,6 @@ function previewImage(file) {
   });
 }
 
-
 /* =========================================================
    11. Create Conversation
 ========================================================= */
@@ -510,22 +466,24 @@ async function createNewThread() {
   try {
     const data = await apiRequest(
       "/conversations",
+
       {
         method: "POST",
 
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
 
-        body: JSON.stringify({})
-      }
+        body: JSON.stringify({}),
+      },
     );
 
     conversationId = data.id;
 
     localStorage.setItem(
       "savedConversationId",
-      conversationId
+
+      conversationId,
     );
 
     chatBox.innerHTML = "";
@@ -539,34 +497,30 @@ async function createNewThread() {
     messageInput.focus();
 
     updateSendButton();
-
   } catch (error) {
     console.error(
       "Create conversation error:",
-      error
-    );
 
-    showError(
-      `${txt.newConversationError} ${error.message}`
+      error,
     );
+    showError(`${txt.newConversationError} ${error.message}`);
   }
 }
-
 
 /* =========================================================
    12. Start New Conversation
 ========================================================= */
 
 function startNewChat() {
-  const modalEl =
-    document.getElementById("newChatModal");
+  const modalEl = document.getElementById("newChatModal");
 
   if (modalEl) {
     modalEl.classList.remove("show");
 
     modalEl.setAttribute(
       "aria-hidden",
-      "true"
+
+      "true",
     );
 
     modalEl.removeAttribute("aria-modal");
@@ -574,8 +528,10 @@ function startNewChat() {
     modalEl.style.display = "none";
   }
 
-  document.querySelectorAll(".modal-backdrop")
-    .forEach(element => element.remove());
+  document
+    .querySelectorAll(".modal-backdrop")
+
+    .forEach((element) => element.remove());
 
   document.body.classList.remove("modal-open");
 
@@ -601,13 +557,10 @@ function startNewChat() {
 
   conversationId = null;
 
-  localStorage.removeItem(
-    "savedConversationId"
-  );
+  localStorage.removeItem("savedConversationId");
 
   createNewThread();
 }
-
 
 /* =========================================================
    13. Display Stored Images
@@ -615,7 +568,7 @@ function startNewChat() {
 
 async function getFileContentUrl(fileId) {
   const response = await apiRequest(
-    `/files/${encodeURIComponent(fileId)}/content`
+    `/files/${encodeURIComponent(fileId)}/content`,
   );
 
   const objectUrl = URL.createObjectURL(response);
@@ -623,56 +576,49 @@ async function getFileContentUrl(fileId) {
   return objectUrl;
 }
 
-
 async function appendStoredImage(fileId) {
   try {
-    const imageUrl =
-      await getFileContentUrl(fileId);
+    const imageUrl = await getFileContentUrl(fileId);
 
     const image = document.createElement("img");
 
     image.src = imageUrl;
 
-    image.className =
-      "img-fluid rounded my-2";
+    image.className = "img-fluid rounded my-2";
 
     image.style.maxHeight = "300px";
 
     image.style.display = "block";
 
-    const wrapper =
-      document.createElement("div");
+    const wrapper = document.createElement("div");
 
-    wrapper.className =
-      "bubble user-msg";
+    wrapper.className = "bubble user-msg";
 
     wrapper.appendChild(image);
 
-    const outer =
-      document.createElement("div");
+    const outer = document.createElement("div");
 
-    outer.className =
-      "d-flex flex-column";
+    outer.className = "d-flex flex-column";
 
     outer.appendChild(wrapper);
 
     chatBox.appendChild(outer);
 
     chatBox.scrollTop = chatBox.scrollHeight;
-
   } catch (error) {
     console.error(
       "Display stored image error:",
-      error
+
+      error,
     );
 
     appendMessage(
       "user",
-      `<div>${escapeHtml(txt.imageLabel)}</div>`
+
+      `<div>${escapeHtml(txt.imageLabel)}</div>`,
     );
   }
 }
-
 
 /* =========================================================
    14. Download Generated Files
@@ -688,12 +634,11 @@ async function appendStoredImage(fileId) {
    /v1/files/{file_id}/content
 */
 
-
-
 async function downloadFromOpenAI(
   fileId,
   fileName,
-  containerId = null
+
+  containerId = null,
 ) {
   try {
     let blob;
@@ -701,12 +646,10 @@ async function downloadFromOpenAI(
     if (containerId) {
       blob = await apiRequest(
         `/containers/${encodeURIComponent(containerId)}` +
-        `/files/${encodeURIComponent(fileId)}/content`
+          `/files/${encodeURIComponent(fileId)}/content`,
       );
     } else {
-      blob = await apiRequest(
-        `/files/${encodeURIComponent(fileId)}/content`
-      );
+      blob = await apiRequest(`/files/${encodeURIComponent(fileId)}/content`);
     }
 
     const url = URL.createObjectURL(blob);
@@ -726,19 +669,15 @@ async function downloadFromOpenAI(
     setTimeout(() => {
       URL.revokeObjectURL(url);
     }, 1000);
-
   } catch (error) {
     console.error(
       "Download error:",
-      error
-    );
 
-    showError(
-      `${txt.downloadError} ${error.message}`
+      error,
     );
+    showError(`${txt.downloadError} ${error.message}`);
   }
 }
-
 
 /* =========================================================
    15. Render Response Annotations
@@ -747,14 +686,14 @@ async function downloadFromOpenAI(
 function createDownloadLink(
   fileId,
   fileName,
-  containerId
+
+  containerId,
 ) {
   const link = document.createElement("a");
 
   link.href = "#";
 
-  link.textContent =
-    fileName || "Download file";
+  link.textContent = fileName || "Download file";
 
   link.addEventListener("click", function (event) {
     event.preventDefault();
@@ -762,24 +701,22 @@ function createDownloadLink(
     downloadFromOpenAI(
       fileId,
       fileName,
-      containerId
+
+      containerId,
     );
   });
 
   return link;
 }
 
-
 function renderOutputText(outputText) {
   let text = outputText.text || "";
 
-  const annotations =
-    outputText.annotations || [];
+  const annotations = outputText.annotations || [];
 
   const html = renderMarkdown(text);
 
-  const container =
-    document.createElement("div");
+  const container = document.createElement("div");
 
   container.innerHTML = html;
 
@@ -796,30 +733,25 @@ function renderOutputText(outputText) {
     ) {
       const fileId = annotation.file_id;
 
-      const containerId =
-        annotation.container_id || null;
+      const containerId = annotation.container_id || null;
 
-      const fileName =
-        annotation.filename ||
-        fileId ||
-        "downloaded_file";
+      const fileName = annotation.filename || fileId || "downloaded_file";
 
       if (!fileId) {
         continue;
       }
 
-      const link =
-        createDownloadLink(
-          fileId,
-          fileName,
-          containerId
-        );
+      const link = createDownloadLink(
+        fileId,
 
-      const wrapper =
-        document.createElement("div");
+        fileName,
 
-      wrapper.className =
-        "my-2 p-2 border rounded";
+        containerId,
+      );
+
+      const wrapper = document.createElement("div");
+
+      wrapper.className = "my-2 p-2 border rounded";
 
       wrapper.appendChild(link);
 
@@ -829,7 +761,6 @@ function renderOutputText(outputText) {
 
   return container;
 }
-
 
 /* =========================================================
    16. Render API Output
@@ -845,18 +776,15 @@ async function renderResponseOutput(responseData) {
        Assistant message
     */
 
-    if (
-      item.type === "message" &&
-      item.role === "assistant"
-    ) {
+    if (item.type === "message" && item.role === "assistant") {
       for (const part of item.content || []) {
         if (part.type === "output_text") {
-          const content =
-            renderOutputText(part);
+          const content = renderOutputText(part);
 
           appendMessage(
             "assistant",
-            content.innerHTML
+
+            content.innerHTML,
           );
 
           hasVisibleText = true;
@@ -865,7 +793,8 @@ async function renderResponseOutput(responseData) {
         if (part.type === "refusal") {
           appendMessage(
             "assistant",
-            renderMarkdown(part.refusal)
+
+            renderMarkdown(part.refusal),
           );
 
           hasVisibleText = true;
@@ -882,34 +811,26 @@ async function renderResponseOutput(responseData) {
 
     if (item.type === "code_interpreter_call") {
       for (const outputItem of item.outputs || []) {
-        if (
-          outputItem.type === "image" &&
-          outputItem.url
-        ) {
+        if (outputItem.type === "image" && outputItem.url) {
           const image = document.createElement("img");
 
           image.src = outputItem.url;
 
-          image.className =
-            "img-fluid rounded my-2";
+          image.className = "img-fluid rounded my-2";
 
           image.style.maxHeight = "400px";
 
           image.style.display = "block";
 
-          const wrapper =
-            document.createElement("div");
+          const wrapper = document.createElement("div");
 
-          wrapper.className =
-            "bubble assistant-msg";
+          wrapper.className = "bubble assistant-msg";
 
           wrapper.appendChild(image);
 
-          const outer =
-            document.createElement("div");
+          const outer = document.createElement("div");
 
-          outer.className =
-            "d-flex flex-column";
+          outer.className = "d-flex flex-column";
 
           outer.appendChild(wrapper);
 
@@ -922,17 +843,15 @@ async function renderResponseOutput(responseData) {
   }
 
   if (!hasVisibleText) {
-    const text =
-      responseData.output_text ||
-      txt.emptyResponse;
+    const text = responseData.output_text || txt.emptyResponse;
 
     appendMessage(
       "assistant",
-      renderMarkdown(text)
+
+      renderMarkdown(text),
     );
   }
 }
-
 
 /* =========================================================
    17. Send Message
@@ -943,16 +862,13 @@ async function sendMessage() {
     return;
   }
 
-  const messageText =
-    messageInput.value.trim();
+  const messageText = messageInput.value.trim();
 
-  const imageFile =
-    imageInput.files?.[0] || null;
+  const imageFile = imageInput.files?.[0] || null;
 
-  const otherFile =
-    fileInput.files?.[0] || null;
+  const otherFile = fileInput.files?.[0] || null;
 
-  if (!messageText && !imageFile && !otherFile) {
+  if (!messageText.trim() && !imageFile && !otherFile && !pendingExternalFile) {
     return;
   }
 
@@ -977,25 +893,26 @@ async function sendMessage() {
     */
 
     if (!conversationId) {
-      const conversation =
-        await apiRequest(
-          "/conversations",
-          {
-            method: "POST",
+      const conversation = await apiRequest(
+        "/conversations",
 
-            headers: {
-              "Content-Type": "application/json"
-            },
+        {
+          method: "POST",
 
-            body: JSON.stringify({})
-          }
-        );
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify({}),
+        },
+      );
 
       conversationId = conversation.id;
 
       localStorage.setItem(
         "savedConversationId",
-        conversationId
+
+        conversationId,
       );
 
       inputSection.style.display = "block";
@@ -1014,7 +931,8 @@ async function sendMessage() {
     if (messageText) {
       content.push({
         type: "input_text",
-        text: messageText
+
+        text: messageText,
       });
 
       userHtml += renderMarkdown(messageText);
@@ -1025,68 +943,81 @@ async function sendMessage() {
     */
 
     if (imageFile) {
-      const imageDataUrl =
-        await imageToDataUrl(imageFile);
+      const imageDataUrl = await imageToDataUrl(imageFile);
 
       content.push({
         type: "input_image",
         image_url: imageDataUrl,
-        detail: "auto"
+
+        detail: "auto",
       });
 
-      const preview =
-        await previewImage(imageFile);
+      const preview = await previewImage(imageFile);
 
-      const temporaryContainer =
-        document.createElement("div");
+      const temporaryContainer = document.createElement("div");
 
       temporaryContainer.appendChild(preview);
 
-      userHtml +=
-        temporaryContainer.innerHTML;
+      userHtml += temporaryContainer.innerHTML;
     }
 
     /*
-       4. Upload general file and add input_file.
+       4. Attach either a file uploaded from VB6 or a file selected in the browser.
     */
 
-    /*
-   4. Upload general file and add input_file.
-*/
+    if (pendingExternalFile) {
+      uploadedFile = {
+        id: pendingExternalFile.id,
+        name: pendingExternalFile.name,
+      };
 
-    if (otherFile) {
-      // Upload the file so Code Interpreter can access it.
+      content.push({
+        type: "input_text",
+        text: `[ATTACHED_FILE_NAME]${uploadedFile.name}`,
+      });
+
+      content.push({
+        type: "input_file",
+        file_id: uploadedFile.id,
+      });
+
+      userHtml += `
+        <div class="file-attachment my-2 p-2 border rounded bg-light text-dark">
+            📄 ${escapeHtml(uploadedFile.name)}
+        </div>
+    `;
+    } else if (otherFile) {
       uploadedFile = await uploadFile(otherFile);
 
-      // Include the file data and its original name in the message.
       const fileDataUrl = await fileToDataUrl(otherFile);
 
       content.push({
         type: "input_file",
         filename: otherFile.name,
-        file_data: fileDataUrl
+        file_data: fileDataUrl,
       });
 
       userHtml += `
-    <div class="file-attachment my-2 p-2 border rounded bg-light text-dark">
-      📄 ${escapeHtml(otherFile.name)}
-    </div>
-  `;
+        <div class="file-attachment my-2 p-2 border rounded bg-light text-dark">
+            📄 ${escapeHtml(otherFile.name)}
+        </div>
+    `;
     }
-
     /*
        5. Show the user message and loading indicator.
     */
 
     appendMessage(
       "user",
-      userHtml
+
+      userHtml,
     );
 
     appendMessage(
       "assistant",
       escapeHtml(txt.processing),
-      true
+
+      true,
     );
 
     messageInput.value = "";
@@ -1105,14 +1036,10 @@ async function sendMessage() {
     if (uploadedFile) {
       tools.push({
         type: "code_interpreter",
-
         container: {
           type: "auto",
-
-          file_ids: [
-            uploadedFile.id
-          ]
-        }
+          file_ids: [uploadedFile.id],
+        },
       });
     }
 
@@ -1134,35 +1061,30 @@ async function sendMessage() {
         {
           role: "user",
 
-          content: content
-        }
+          content: content,
+        },
       ],
 
       store: true,
 
       include: [
         "code_interpreter_call.outputs",
-        "message.input_image.image_url"
-      ]
+
+        "message.input_image.image_url",
+      ],
     };
 
     if (tools.length > 0) {
       requestBody.tools = tools;
     }
 
-    const responseData =
-      await apiRequest(
-        "/responses",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json"
-          },
-
-          body: JSON.stringify(requestBody)
-        }
-      );
+    const responseData = await apiRequest("/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
 
     /*
        8. Remove loading indicator.
@@ -1174,17 +1096,11 @@ async function sendMessage() {
        9. Handle unsuccessful or incomplete responses.
     */
 
-    if (
-      responseData.status &&
-      responseData.status !== "completed"
-    ) {
+    if (responseData.status && responseData.status !== "completed") {
       const reason =
-        responseData.incomplete_details?.reason ||
-        responseData.status;
+        responseData.incomplete_details?.reason || responseData.status;
 
-      throw new Error(
-        `Response status: ${reason}`
-      );
+      throw new Error(`Response status: ${reason}`);
     }
 
     /*
@@ -1193,25 +1109,24 @@ async function sendMessage() {
 
     await renderResponseOutput(responseData);
 
+    // The externally uploaded file has now been sent successfully.
+    pendingExternalFile = null;
   } catch (error) {
     console.error(
       "Send message error:",
-      error
+
+      error,
     );
 
     removeLoadingMessage();
 
-    showError(
-      `${txt.connectionError} ${error.message}`
-    );
-
+    showError(`${txt.connectionError} ${error.message}`);
   } finally {
     isProcessing = false;
 
     updateSendButton();
   }
 }
-
 
 /* =========================================================
    18. Load Conversation History
@@ -1244,18 +1159,18 @@ async function fetchAllMessages() {
         `&include%5B%5D=message.input_image.image_url`;
 
       if (after) {
-        endpoint +=
-          `&after=${encodeURIComponent(after)}`;
+        endpoint += `&after=${encodeURIComponent(after)}`;
       }
 
-      const page =
-        await apiRequest(endpoint);
+      const page = await apiRequest(endpoint);
 
       console.log(
         "Conversation images:",
         page.data
-          .flatMap(item => item.content || [])
-          .filter(part => part.type === "input_image")
+
+          .flatMap((item) => item.content || [])
+
+          .filter((part) => part.type === "input_image"),
       );
       const items = page.data || [];
 
@@ -1287,6 +1202,12 @@ async function fetchAllMessages() {
 
       let contentHtml = "";
 
+      const hasStoredFileName = (item.content || []).some(
+        (part) =>
+          part.type === "input_text" &&
+          (part.text || "").startsWith("[ATTACHED_FILE_NAME]"),
+      );
+
       for (const part of item.content || []) {
         /*
            Text input/output
@@ -1297,13 +1218,21 @@ async function fetchAllMessages() {
           part.type === "output_text" ||
           part.type === "text"
         ) {
-          const text =
-            part.text || "";
+          const text = part.text || "";
 
-          contentHtml +=
-            role === "assistant"
-              ? renderMarkdown(text)
-              : renderMarkdown(text);
+          if (role === "user" && text.startsWith("[ATTACHED_FILE_NAME]")) {
+            const storedFileName = text.substring(
+              "[ATTACHED_FILE_NAME]".length,
+            );
+
+            contentHtml += `
+        <div class="file-attachment my-2 p-2 border rounded bg-light text-dark">
+            📄 ${escapeHtml(storedFileName)}
+        </div>
+    `;
+          } else {
+            contentHtml += renderMarkdown(text);
+          }
 
           /*
              Generated file annotations.
@@ -1314,38 +1243,32 @@ async function fetchAllMessages() {
               annotation.type === "container_file_citation" ||
               annotation.type === "file_path"
             ) {
-              const fileId =
-                annotation.file_id;
+              const fileId = annotation.file_id;
 
-              const containerId =
-                annotation.container_id || null;
+              const containerId = annotation.container_id || null;
 
               const fileName =
-                annotation.filename ||
-                fileId ||
-                "downloaded_file";
+                annotation.filename || fileId || "downloaded_file";
 
               if (!fileId) {
                 continue;
               }
 
-              const link =
-                createDownloadLink(
-                  fileId,
-                  fileName,
-                  containerId
-                );
+              const link = createDownloadLink(
+                fileId,
 
-              const wrapper =
-                document.createElement("div");
+                fileName,
 
-              wrapper.className =
-                "my-2 p-2 border rounded";
+                containerId,
+              );
+
+              const wrapper = document.createElement("div");
+
+              wrapper.className = "my-2 p-2 border rounded";
 
               wrapper.appendChild(link);
 
-              contentHtml +=
-                wrapper.outerHTML;
+              contentHtml += wrapper.outerHTML;
             }
           }
         }
@@ -1370,7 +1293,8 @@ async function fetchAllMessages() {
           } else {
             console.warn(
               "Image URL was not returned by OpenAI:",
-              part.file_id
+
+              part.file_id,
             );
 
             contentHtml += `
@@ -1389,38 +1313,34 @@ async function fetchAllMessages() {
           Stored file inputs.
         */
 
-        if (part.type === "input_file") {
-          const storedFileName =
-            part.filename || null;
+        if (part.type === "input_file" && !hasStoredFileName) {
+          const storedFileName = part.filename || null;
 
           contentHtml += `
-    <div class="file-attachment my-2 p-2 border rounded bg-light text-dark">
-      📄 ${escapeHtml(storedFileName || txt.fileLabel)}
-    </div>
-  `;
+            <div class="file-attachment my-2 p-2 border rounded bg-light text-dark">
+              📄 ${escapeHtml(storedFileName || txt.fileLabel)}
+            </div>
+          `;
         }
       }
 
       if (contentHtml.trim()) {
         appendMessage(
           role,
-          contentHtml
+
+          contentHtml,
         );
       }
     }
-
   } catch (error) {
     console.error(
       "Load conversation history error:",
-      error
-    );
 
-    showError(
-      `${txt.connectionError} ${error.message}`
+      error,
     );
+    showError(`${txt.connectionError} ${error.message}`);
   }
 }
-
 
 /* =========================================================
    19. Send Button State
@@ -1430,52 +1350,42 @@ function updateSendButton() {
   if (isProcessing) {
     sendBtn.disabled = true;
 
-    sendBtn.innerHTML =
-      `<span class="loading-icon"></span>`;
+    sendBtn.innerHTML = `<span class="loading-icon"></span>`;
 
     return;
   }
 
   sendBtn.innerText = txt.send;
 
-  const hasText =
-    messageInput.value.trim() !== "";
+  const hasText = messageInput.value.trim() !== "";
 
-  const hasImage =
-    imageInput.files &&
-    imageInput.files.length > 0;
+  const hasImage = imageInput.files && imageInput.files.length > 0;
 
-  const hasFile =
-    fileInput.files &&
-    fileInput.files.length > 0;
+  const hasFile = fileInput.files && fileInput.files.length > 0;
 
-  sendBtn.disabled =
-    !(hasText || hasImage || hasFile);
+  const hasExternalFile = Boolean(pendingExternalFile);
+
+  sendBtn.disabled = !(hasText || hasImage || hasFile || hasExternalFile);
 }
-
 
 messageInput.addEventListener(
   "input",
-  updateSendButton
-);
 
+  updateSendButton,
+);
 
 messageInput.addEventListener(
   "keydown",
   function (event) {
-    if (
-      event.key === "Enter" &&
-      !event.shiftKey
-    ) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
 
       if (!sendBtn.disabled) {
         sendMessage();
       }
     }
-  }
+  },
 );
-
 
 /* =========================================================
    20. Apply Language
@@ -1484,69 +1394,47 @@ messageInput.addEventListener(
 function applyLanguage() {
   const isEnglish = lang === "2";
 
-  document.documentElement.lang =
-    isEnglish ? "en" : "ar";
+  document.documentElement.lang = isEnglish ? "en" : "ar";
 
-  document.documentElement.dir =
-    isEnglish ? "ltr" : "rtl";
+  document.documentElement.dir = isEnglish ? "ltr" : "rtl";
 
-  document.title =
-    txt.assistantName;
+  document.title = txt.assistantName;
 
-  sendBtn.innerText =
-    txt.send;
+  sendBtn.innerText = txt.send;
 
-  messageInput.placeholder =
-    txt.placeholder;
+  messageInput.placeholder = txt.placeholder;
 
-  newChatSection.querySelector("button").innerText =
-    txt.newChat;
+  newChatSection.querySelector("button").innerText = txt.newChat;
 
-  newChatInputSection.innerText =
-    txt.newChat;
+  newChatInputSection.innerText = txt.newChat;
 
-  document.getElementById(
-    "newChatModalLabel"
-  ).innerText =
-    txt.confirmNewChat;
+  document.getElementById("newChatModalLabel").innerText = txt.confirmNewChat;
 
-  document.querySelector(
-    "#newChatModal .modal-body"
-  ).innerText =
+  document.querySelector("#newChatModal .modal-body").innerText =
     txt.confirmMessage;
 
-  document.querySelector(
-    '[data-bs-dismiss="modal"]'
-  ).innerText =
-    txt.no;
+  document.querySelector('[data-bs-dismiss="modal"]').innerText = txt.no;
 
-  document.querySelector(
-    "#newChatModal .btn-secondary.fs-6"
-  ).innerText =
+  document.querySelector("#newChatModal .btn-secondary.fs-6").innerText =
     txt.yes;
 
-  document.querySelector(
-    ".chat-header div"
-  ).innerText =
-    txt.assistantName;
+  document.querySelector(".chat-header div").innerText = txt.assistantName;
 
-  imageLabel.title =
-    txt.uploadImage;
+  imageLabel.title = txt.uploadImage;
 
   imageLabel.setAttribute(
     "aria-label",
-    txt.uploadImage
+
+    txt.uploadImage,
   );
 
-  fileLabel.title =
-    txt.attachFile;
+  fileLabel.title = txt.attachFile;
 
   fileLabel.setAttribute(
     "aria-label",
-    txt.attachFile
+    txt.attachFile,
   );
 }
-
 
 /* =========================================================
    21. Initialize Application
@@ -1586,5 +1474,28 @@ async function initializeApplication() {
   newChatSection.style.display = "block";
 }
 
+function handleUploadedFile(fileId, uploadedName) {
+  if (!fileId || typeof fileId !== "string") {
+    console.error("handleUploadedFile: invalid file id");
+    return;
+  }
+
+  pendingExternalFile = {
+    id: fileId,
+    name: uploadedName || "Excel exported from VB6.xlsx",
+  };
+
+  const input = document.getElementById("messageInput");
+
+  if (input && !input.value.trim()) {
+    input.value =
+      lang === "1"
+        ? "حلل ملف Excel المرفق تحليلاً مفصلاً، واستخرج أهم النتائج والإحصائيات والأنماط، واقترح جداول ورسومات مناسبة. لا تخترع بيانات غير موجودة في الملف."
+        : "Analyze the attached Excel file in detail. Extract key findings, statistics, and patterns, and suggest suitable tables and charts. Do not invent data that is not present in the file.";
+  }
+
+  updateSendButton();
+  sendMessage();
+}
 
 initializeApplication();
